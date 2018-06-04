@@ -8,20 +8,24 @@ class UsersController extends AppController{
 
 	public function initialize(){
 		parent::initialize();
-		$this->Auth->allow(['logout', 'login', 'add']);
 	}
 
 	public function login(){
+		$user = null;
 		if($this->request->is('post')){
 			$user = $this->Auth->identify();
 			if($user){
 				$this->Auth->setUser($user);
 				$this->Flash->success(__('You have been logged in'));
+				if($user['username'] == "admin"){
+					return $this->redirect(['controller' => 'Admin', 'action' => 'index']);
+				}else{
+					return $this->redirect(['controller' => 'TimePunches', 'action' => 'index']);
+				}
 			}else{
 			$this->Flash->error(__('Your username or password is incorrect'));
 			}
 		}
-
 		$this->set('color', 'red');
 	}
 
