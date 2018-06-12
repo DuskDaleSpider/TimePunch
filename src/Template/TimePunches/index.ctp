@@ -5,6 +5,7 @@
 	$lunchStartPath = $this->Url->build('/TimePunches/lunchStart', true);
 	$lunchEndPath = $this->Url->build('/TimePunches/lunchEnd', true);
 	$punchOutPath = $this->Url->build('/TimePunches/punchOut', true);
+	$viewPunchPath = $this->Url->build('/TimePunches/view', true);
 ?>
 
 <!-- TODO: Move style to own stylesheet -->
@@ -46,6 +47,9 @@
 		<h3 class="section-title">User Options</h3>
 	</div>
 	<div class="row text-center">
+		<div class="col">
+			<a class="btn btn-primary" href="<?=$viewPunchPath?>">View Punches</a>
+		</div>
 		<div class="col">
 			<a class="btn btn-primary" href="<?=$logoutPath?>">Log out</a>
 		</div>

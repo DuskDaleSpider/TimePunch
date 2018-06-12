@@ -8,7 +8,6 @@ class TimePunchesController extends AppController{
 
 	public function index(){
 		$this->viewBuilder()->setLayout('myLayout');
-		$this->Flash->default(__('You are on the TimePunches index'));
 	}
 
 	public function punchIn(){
@@ -29,6 +28,7 @@ class TimePunchesController extends AppController{
 		$time_punch = $this->TimePunches->newEntity();
 
 		$time_punch->user_id = $user_id;
+		$time_punch->date = $this->TimePunches->query()->func()->now('date');
 		$time_punch->punch_in = $this->TimePunches->query()->func()->now();
 
 		//save timepunch
@@ -173,6 +173,39 @@ class TimePunchesController extends AppController{
 
 		}else{
 			$this->Flash->error(__('You have not clocked in yet'));
+			return $this->redirect('/TimePunches/');
+		}
+
+	}
+
+	public function view(){
+		//load open punches
+		$this->loadModel('OpenPunches');
+
+		//check if there's an open punch
+		$openPunch = $this->OpenPunches->find()
+			->where(['user_id =' => $this->Auth->user('id')])
+			->first();
+
+		if($openPunch){
+			$timePunch = $this->TimePunches->get($openPunch->time_punch_id);
+
+			if($timePunch){
+				$this->set('timePunch', $timePunch);
+				return;
+			}
+		}
+
+		//try to find a punch from today
+		$timePunch = $this->TimePunches->find()
+			->where([
+				'date' => $this->TimePunches->query()->func()->now('date')
+			])->first();
+		if($timePunch){
+			$this->set('timePunch', $timePunch);
+			return;
+		}else{
+			$this->Flash->error(__('There have been no punches so far for today'));
 			return $this->redirect('/TimePunches/');
 		}
 
