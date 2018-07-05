@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Controller\AppController;
+use Cake\I18n\Time;
+use Cake\I18n\Date;
 
 class TimePunchesController extends AppController{
 
@@ -101,6 +103,14 @@ class TimePunchesController extends AppController{
 		$openPunch = $this->OpenPunches->find()
 			->where(['user_id =' => $this->Auth->user('id')])
 			->first();
+
+		//fetch the minimum lunch time setting
+		$this->loadModel('Settings');
+		$min_lunch = $this->Settings->find()
+			->select(['min_lunch_mins'])
+			->where(['Settings.is_active =' => 1])
+			->firstOrFail();
+
 		if($openPunch){
 			//find the current timepunch
 			$timePunch = $this->TimePunches->get($openPunch->time_punch_id);
@@ -115,6 +125,19 @@ class TimePunchesController extends AppController{
 
 				//add lunch end date
 				$timePunch->lunch_end = $this->TimePunches->query()->func()->now();
+
+				//check if the minimum time has passed for the users lunch
+
+				$now = Time::now(); //get current time
+				//gets difference between current time and when user started lunch
+				$timeDiff = ($now->getTimestamp() - $timePunch->lunch_start->getTimestamp()) / 60;
+
+				//checks if time difference is less than the minimun time needed for lunch
+				if($timeDiff < $min_lunch->min_lunch_mins){
+					$errorMessage = "You need a minimum of " . $min_lunch->min_lunch_mins . " minutes before ending your lunch.";
+					$this->Flash->error(__($errorMessage));
+					return $this->redirect('/TimePunches/');
+				}
 
 				//save the timepunch
 				if($this->TimePunches->save($timePunch)){
@@ -178,7 +201,21 @@ class TimePunchesController extends AppController{
 
 	}
 
-	public function view(){
+	public function view($punch_id){
+		//find specific punch
+		if($punch_id){
+			$punch = $this->TimePunches->get($punch_id);
+			//check if this punch belongs to current user
+			if($punch->user_id != $this->Auth->user('id')){
+				$this->Flash->error(__('That is not your punch'));
+				return $this->redirect(['action' => 'index']);
+			}
+
+			$this->set('timePunch', $punch);
+			return;
+		}
+
+
 		//load open punches
 		$this->loadModel('OpenPunches');
 
@@ -209,6 +246,79 @@ class TimePunchesController extends AppController{
 			return $this->redirect('/TimePunches/');
 		}
 
+	}
+
+	public function payPeriod(){
+		//get current payperiod start date
+
+		//fetch pay period length and first pay period start date
+		$this->loadModel('Settings');
+		$settings = $this->Settings->find()
+			->select(['pp_start_date', 'pay_period_days'])
+			->where(['is_active =' => 1])
+			->firstOrFail();
+
+		//calculate number of days passed since start of first pay period
+		$daysPassed = (Date::now()->getTimestamp() - $settings->pp_start_date->getTimestamp())/60/60/24;
+		$daysPassed = floor($daysPassed);
+
+		//calculate first day of current pay period
+		$daysIntoPayPeriod = $daysPassed % $settings->pay_period_days;
+		$firstDay = Date::now()->subDays($daysIntoPayPeriod);
+
+		//get users timepunches starting from the first day of the period
+		$timePunches = $this->TimePunches->find()
+			->where([
+				'date >=' => $firstDay,
+				'user_id =' => $this->Auth->user('id')
+			]);
+
+		$days = [];
+
+		//calculate hours worked for each day
+		foreach($timePunches as $punch){
+			$hours = 0;
+			$date = $punch->date;
+			$punchIn = NULL;
+			$lunchStart = NULL;
+			$lunchEnd = NULL;
+			$punchOut = NULL;
+
+			//get timestamps for punches
+			$punchIn = $punch->punch_in->getTimestamp();
+			if($punch->lunch_start != NULL){
+				$lunchStart = $punch->lunch_start->getTimestamp();
+			}
+			if($punch->lunch_end != NULL){
+				$lunchEnd = $punch->lunch_end->getTimestamp();
+			}
+			if($punch->punch_out != NULL){
+				$punchOut = $punch->punch_out->getTimestamp();
+			}
+
+			
+			//half day
+			if($lunchStart == NULL && $punchOut != NULL){
+				$hours += ($punchOut - $punchIn)/60/60;
+			}
+			//full day
+			else if($lunchStart != NULL && $punchOut != NULL){
+				$hours += ($lunchStart - $punchIn)/60/60;
+				$hours += ($punchOut - $lunchEnd)/60/60;
+			}
+			//currently on lunch
+			else if($lunchStart != NULL && $lunchEnd == NULL){
+				$hours += ($lunchStart - $punchIn)/60/60;
+			}
+
+			$temp = [];
+			$temp['date'] = $date;
+			$temp['hours'] = $hours;
+			$temp['punch_id'] = $punch->id;
+			$days[] = $temp;
+		}
+
+		$this->set('days', $days);
 	}
 
 	public function isAuthorized(){

@@ -69,6 +69,9 @@ class AppController extends Controller
             ],
             'unauthorizedRedirect' => $this->referer()
         ]);
+
+        //set the default loadout for the app
+        $this->viewBuilder()->setLayout('myLayout');
     }
 
     public function isAuthorized(){

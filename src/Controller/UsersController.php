@@ -43,7 +43,7 @@ class UsersController extends AppController{
 
 				return $this->redirect(['action' => 'login']);
 			}
-			$this->Flash->error(__('The user could not bew saved. Please try again.'));
+			$this->Flash->error(__('The user could not be saved. Please try again.'));
 		}
 		$this->set(compact('user'));
 	}
